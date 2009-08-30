@@ -11,6 +11,28 @@ use Data::Dumper;
 
 my $tld = "http://www.kiva.org/";
 
+my $part_ins = q{
+INSERT into kiva_parts(partnerid, fieldpartner, rating, startdate, timeonkiva, kivaents, totalloans, delinqrate, defrate, exchangeloss,
+fundingstatus, networkaffs, emailcontact, womenents, averateloanamt, aveindloan, avegrploan, aveentsgroup, avelocalgdp, averaised,aveloanterm,
+totaljournals,journalcoverage,journalkivaents,journalsfreq,averecommend,aveinterest,avelocalinterest)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+};
+
+sub insertDB{
+  my $self = shift;
+  my $dbh = shift;
+  my @params = ();
+  foreach (qw/ id FieldPartner FieldPartnerRiskRating StartDateOnKiva TimeOnKiva KivaEntrepreneurs TotalLoans DelinquencyRate DefaultRate 
+CurrencyExchangeLossRate FundraisingStatus NetworkAffiliation EmailContact LoanstoWomenEntrepreneurs AverageLoanSize AverageIndividualLoanSize
+ AverageGroupLoanSize
+AverageNumberOfEntrepreneursPerGroup AverageGDPPerCapitaPPPinLocalCountry AverageLoanSizeGDPPerCapitaPPP AverageTimeToFundALoan
+AverageDollarsRaisedPerDayPerLoan AverageLoanTerm TotalJournals JournalCoverage JournalCoverageKivaFellows JournalFrequencyAveragePerLoanPerYear
+AverageNumberOfRecommendationsPerJournal AverageInterestRateBorrowerPaysToKivaFieldPartner AverageLocalMoneyLenderInterestRate/){
+	    push @params, ($self->{$_}?$self->{$_}:"");
+    }
+  $dbh->do($part_ins, {}, @params) or die "Error inserting partner: ".$dbh->errstr."\n";
+}
+
 sub new{
     my ($pkg, $attrs) = @_;
     return undef unless $attrs;
@@ -19,17 +41,17 @@ sub new{
     return $self;
 }
 
-sub new_from_id{
+sub new_from_url{
     my ($pkg, $url) = @_;
     return undef unless $url;
     my $self = {};
     my $ua = new LWP::UserAgent();
-    my $res = $ua->get($tld."about/aboutPartner?id=$url");
+    my $res = $ua->get($tld.$url);
     if (!$res->is_success){
-	print "Warning: unable to retrieve page: $url\nStatus: ".$res->status_line."\n";
+	print "Warning: unable to retrieve page: $tld$url\nStatus: ".$res->status_line."\n";
 	return undef;
     }
-    print "KivaPart Fetched: ".$tld."about/aboutPartner?id=$url\n";
+    print "KivaPart Fetched: $tld$url\n";
     print "Status: ".$res->status_line."\n";
     my $tree = HTML::TreeBuilder->new_from_content($res->content);
     my @stats = $tree->look_down("_tag" => "div", "class" => "kvInfoBox");
@@ -40,7 +62,7 @@ sub new_from_id{
 	for my $nvp ($data->look_down("_tag"=>"tr")){
 #	print $nvp->as_HTML(),"\n";
 	    my @conts = $nvp->content_list();
-	    while ((@conts > 1) && ($conts[0]->as_trimmed_text() eq "")){ shift @conts;}
+	    while ((@conts > 1) && (!clean($conts[0]->as_trimmed_text()) || clean($conts[0]->as_trimmed_text() eq ""))){ shift @conts;}
 	    next if (@conts < 2);
 	    my $label = $conts[0]->as_trimmed_text();
 	    my $value = $conts[1]->as_trimmed_text();
@@ -92,34 +114,6 @@ sub new_from_id{
     $tree->destroy;
     bless $self, $pkg;
     return $self;
-}
-
-sub is_different{
-    my ($self, $targ) = @_;
-    foreach (qw/ id FieldPartnerRiskRating FieldPartner StartDateOnKiva TimeOnKiva KivaEntrepreneurs TotalLoans DelinquencyRate DefaultRate
-CurrencyExchangeLossRate FundraisingStatus NetworkAffiliation EmailContact LoanstoWomenEntrepreneurs AverageLoanSize AverageIndividualLoanSize
- AverageGroupLoanSize
-AverageNumberOfEntrepreneursPerGroup AverageGDPPerCapitaPPPinLocalCountry AverageLoanSizeGDPPerCapitaPPP AverageTimeToFundALoan
-AverageDollarsRaisedPerDayPerLoan AverageLoanTerm TotalJournals JournalCoverage JournalCoverageKivaFellows JournalFrequencyAveragePerLoanPerYear
-	     AverageNumberOfRecommendationsPerJournal AverageInterestRateBorrowerPaysToKivaFieldPartner AverageLocalMoneyLenderInterestRate/){
-	return 1 if ($self->{$_} ne $targ->{$_});
-    }
-    return undef;
-}
-
-sub to_string{
-    my ($self) = @_;
-    my @ret = ();
-    foreach (qw/ id FieldPartnerRiskRating FieldPartner StartDateOnKiva TimeOnKiva KivaEntrepreneurs TotalLoans DelinquencyRate DefaultRate 
-CurrencyExchangeLossRate FundraisingStatus NetworkAffiliation EmailContact LoanstoWomenEntrepreneurs AverageLoanSize AverageIndividualLoanSize
- AverageGroupLoanSize
-AverageNumberOfEntrepreneursPerGroup AverageGDPPerCapitaPPPinLocalCountry AverageLoanSizeGDPPerCapitaPPP AverageTimeToFundALoan
-AverageDollarsRaisedPerDayPerLoan AverageLoanTerm TotalJournals JournalCoverage JournalCoverageKivaFellows JournalFrequencyAveragePerLoanPerYear
-AverageNumberOfRecommendationsPerJournal AverageInterestRateBorrowerPaysToKivaFieldPartner AverageLocalMoneyLenderInterestRate/){
-	    push @ret, ($self->{$_}?$self->{$_}:"");
-#	    printf("%s - %s\n", $_, $self->{$_});
-    }
-    return join("\t",@ret);
 }
 
 #to ensure that the delimiting character is not in any field we present to the CSV file

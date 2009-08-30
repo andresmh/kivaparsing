@@ -11,116 +11,76 @@ use Data::Dumper;
 
 my $tld = "http://www.kiva.org/";
 
-sub new{
-    my ($pkg, $string) = @_;
-    return undef unless $string;
-    my $self = {};
-    chomp $string;
-    my ($type, $time, $url, $id,$name, $act, $loan, $days, $country, $use, $repay, $repaid, $listed, $disb,
-             $fund, $kiva_time, $kiva_ents, $tot_loans, $delinq, $default, $group_name, $group_members,
-	 $location, $curr_x, $curr_rate, $ave_income, $curr, $x_rate, $short, $loan_req, $raised, $needed, $partid, $partner, 
-	$part_rating, $part_kivastart, $part_kivatime, $part_kivaents, $part_totloans, $part_delinq, $part_default, $part_xloss,
-	$part_fundstat, $part_network, $part_email, $part_womenents, $part_aveloan, $part_aveindloan, $part_avegrploan, 
-	$part_aveentsgroup, $part_avelocalgdp, $part_aveloangdp, $part_aveloanfund, $part_averaised, $part_aveterm, $part_totjourn,
-	$part_journcov, $part_journcovkiva, $part_journfreqloan, $part_averecom, $part_interpart, $part_localinter) =
-	    split(/\t/, $string);
-    $self->{'type'} = $type;
-    $self->{'time'} = str2time($time);
-    $self->{'url'} = $url;
-    $self->{'id'} = $id;
-    $self->{'name'} = $name;
-    $self->{'act'} = $act;
-    $self->{'loan'} = $loan;
-    $self->{'days'} = $days;
-    $self->{'country'} = $country;
-    $self->{'partner'} = $partner;
-    $self->{'part_id'} = $partid;
-    $self->{'short'} = $short;
-    $self->{'use'} = $use;
-    $self->{'repay'} = $repay;
-    $self->{'repaid'} = $repaid;
-    $self->{'listed'} = $listed;
-    $self->{'disb'} = $disb;
-    $self->{'fund'} = $fund;
-    $self->{'kiva_time'} = $kiva_time;
-    $self->{'kiva_ents'} = $kiva_ents;
-    $self->{'tot_loans'} = $tot_loans;
-    $self->{'delinq'} = $delinq;
-    $self->{'default'} = $default;
-    $self->{'group_name'} = $group_name;
-    $self->{'group_members'} = $group_members;
-    $self->{'location'} = $location;
-    $self->{'curr_x'} = $curr_x;
-    $self->{'curr_rate'} = $curr_rate;
-    $self->{'ave_income'} = $ave_income;
-    $self->{'curr'} = $curr;
-    $self->{'x_rate'} = $x_rate;
-    $self->{'loan_req'} = $loan_req;
-    $self->{'raised'} = $raised;
-    $self->{'needed'} = $needed;
-    my $part = {
-	id => $partid,
-FieldPartnerRiskRating =>$part_rating,
-FieldPartner => $partner,
-StartDateOnKiva =>$part_kivastart,
-TimeOnKiva =>$part_kivatime,
-KivaEntrepreneurs =>$part_kivaents,
-TotalLoans =>$part_totloans,
-DelinquencyRate =>$part_delinq,
-DefaultRate =>$part_default,
-CurrencyExchangeLossRate =>$part_xloss,
-FundraisingStatus =>$part_fundstat,
-NetworkAffiliation =>$part_network,
-EmailContact =>$part_email,
-LoanstoWomenEntrepreneurs =>$part_womenents,
-AverageLoanSize =>$part_aveloan,
-AverageIndividualLoanSize =>$part_aveindloan,
-AverageGroupLoanSize =>$part_avegrploan,
-AverageNumberOfEntrepreneursPerGroup =>$part_aveentsgroup,
-AverageGDPPerCapitaPPPinLocalCountry =>$part_avelocalgdp,
-AverageLoanSizeGDPPerCapitaPPP =>$part_aveloangdp,
-AverageTimeToFundALoan =>$part_aveloanfund,
-AverageDollarsRaisedPerDayPerLoan =>$part_averaised,
-AverageLoanTerm =>$part_aveterm,
-TotalJournals =>$part_totjourn,
-JournalCoverage =>$part_journcov,
-JournalCoverageKivaFellows =>$part_journcovkiva,
-JournalFrequencyAveragePerLoanPerYear =>$part_journfreqloan,
-AverageNumberOfRecommendationsPerJournal =>$part_averecom,
-AverageInterestRateBorrowerPaysToKivaFieldPartner =>$part_interpart,
-AverageLocalMoneyLenderInterestRate =>$part_localinter
-    };
-    bless $self, $pkg;
-    return ($self, $part);
+
+#set up prepared queries
+my $chkqry = q{
+SELECT 1 
+FROM kiva_ent 
+WHERE 
+	id = ?
+	AND type = ?
+	AND activity = ?
+	AND loanamt = ?
+	AND daysleft = ?
+	AND country = ?
+	AND partner = ?
+	AND loan_use = ?
+	AND repayrate = ?
+	AND repaid = ?
+	AND listdate = ?
+	AND disbursmentdate = ?
+	AND timeonkiva = ?
+	AND entreponkiva = ?
+	AND totalloans = ?
+	AND delinquentrate = ?
+	AND defaultrate = ?
+	AND location = ?
+AND averageincome = ?
+AND loanreq = ?
+AND raised = ?
+AND needed = ?
+AND description = ?
+};
+
+sub inDB{
+  my $self = shift;
+  my $dbh = shift;
+  my @params = ();
+  foreach (qw/ id type act loan days country part_id use repay repaid listed disb 
+	     kiva_time kiva_ents tot_loans delinq default location ave_income loan_req raised needed short/){
+	    push @params, ($self->{$_}?$self->{$_}:"");
+    }
+  my $rows = $dbh->selectall_arrayref($chkqry, {}, @params) or die "Error selecting from database: ".$dbh->errstr."\n";
+  return (scalar(@$rows) > 0);
+}
+
+
+my $ins_qry = q{
+INSERT INTO kiva_ent(type, time, url, id, name, activity, loanamt, daysleft, country, loan_use, repayrate, partner, repaid, listdate, 
+disbursmentdate, fundraising, timeonkiva, entreponkiva, totalloans, delinquentrate, defaultrate, groupname, groupmembers, location, 
+currencyexchange, currencyexchangeloss, averageincome, currency, exchangerate, description, loanreq, raised, needed)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+};
+
+sub insertDB {
+  my $self = shift;
+  my $dbh = shift;
+  my @params = ();
+foreach (qw/ type time url id name act loan days country use repay partner repaid listed disb 
+	     fund kiva_time kiva_ents tot_loans delinq default group_name group_members
+	     location curr_x curr_rate ave_income curr x_rate short loan_req raised needed/){
+	if ($_ eq "time"){
+	    my ($sec,$min,$hour,$mday,$mon,$year) = localtime($self->{$_});
+	    push @params, sprintf("%4u-%02u-%02u %02u:%02u:%02u", $year+1900, $mon, $mday, $hour, $min, $sec);
+	}
+	else{
+	    push @params, ($self->{$_}?$self->{$_}:"");
+	}
+    }
+   $dbh->do($ins_qry, {}, @params) or die "Error inserting ent: ".$dbh->errstr."\n";
 }
 
 #utility functions for the class
-sub is_newer{
-    my ($self, $targ) = @_;
-    
-    return ($self->{time} > $targ->{time});
-}
-
-sub is_different{
-    my ($self, $targ) = @_;
-    foreach (qw/ type id act loan days country partner part_id use repay repaid listed disb
-             fund kiva_time kiva_ents tot_loans delinq default
-	 location curr_x curr_rate ave_income curr x_rate short loan_req raised needed/){
-	next if (!$self->{$_} && !$targ->{$_});
-	if (($self->{$_} && !$targ->{$_})||
-	    (!$self->{$_} && $targ->{$_})||
-	    (clean($self->{$_}) ne clean($targ->{$_}))){
-#	    printf("'%s' is different from '%s'\n",$self->{$_},$targ->{$_});
-	    return 1;
-	}
-    }
-    return $self->{'part_obj'}->is_different($targ->{'part_obj'});
-}
-
-sub setPartner{
-    my ($self, $part) = @_;
-    $self->{'part_obj'} = $part;
-}
 
 sub new_from_url{
     my ($pkg, $url) = @_;
@@ -236,25 +196,6 @@ sub new_from_url{
     $tree->destroy;
     bless $self, $pkg;
     return $self;
-}
-
-sub to_string{
-    my ($self) = @_;
-    my @ret = ();
-    foreach (qw/ type time url id name act loan days country partner part_id use repay repaid listed disb 
-	     fund kiva_time kiva_ents tot_loans delinq default group_name group_members
-	     location curr_x curr_rate ave_income curr x_rate short loan_req raised needed/){
-	if ($_ eq "time"){
-	    my ($sec,$min,$hour,$mday,$mon,$year) = localtime($self->{$_});
-	    push @ret, sprintf("%4u-%02u-%02u %02u:%02u:%02u", $year+1900, $mon, $mday, $hour, $min, $sec);
-	}
-	else{
-	    push @ret, ($self->{$_}?$self->{$_}:"");
-	}
-#	printf("%s : %s\n", $_, $self->{$_});
-    }
-    push @ret, $self->{'part_obj'}->to_string(); 
-    return \@ret;
 }
 
 #to ensure that the delimiting character is not in any field we present to the CSV file
