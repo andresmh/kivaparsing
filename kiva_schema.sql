@@ -68,5 +68,10 @@ create table kiva_ent(
 	primary key(time,id)
 );
 
-create table ent_stats();
+create table ent_stats(
+	id int not null,
+	page int not null,
+	pos int not null,
+	scrape_time TIMESTAMP
+);
 

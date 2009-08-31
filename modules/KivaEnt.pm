@@ -80,6 +80,16 @@ foreach (qw/ type time url id name act loan days country use repay partner repai
    $dbh->do($ins_qry, {}, @params) or die "Error inserting ent: ".$dbh->errstr."\n";
 }
 
+my $pos_qry = q{
+INSERT into ent_stats(id, page, pos) VALUES(?,?,?)
+};
+
+sub insertPosition{
+  my ($self, $dbh, $page, $pos) = @_;
+  $dbh->do($pos_qry, {}, ($self->{'id'}, $page, $pos)) or die "Error inserting position data".$dbh->errstr."\n";
+}
+
+
 #utility functions for the class
 
 sub new_from_url{
@@ -204,7 +214,8 @@ sub clean{
     return undef unless $str;
     $str =~ s/^\s+//;
     $str =~ s/\s+$//;
-    $str =~ s/\t//;
+    $str =~ s/\t//g;
+    $str =~ s/[%\$]//g;
     return $str;
 }
 
@@ -216,6 +227,131 @@ sub getId{
 sub getPartId{
     my $self=shift;
     return $self->{'part_id'};
+}
+
+
+sub new{
+    my ($pkg, $string) = @_;
+    return undef unless $string;
+    my $self = {};
+    chomp $string;
+    my ($type, $time, $url, $id,$name, $act, $loan, $days, $country, $use, $repay, $repaid, $listed, $disb,
+             $fund, $kiva_time, $kiva_ents, $tot_loans, $delinq, $default, $group_name, $group_members,
+	 $location, $curr_x, $curr_rate, $ave_income, $curr, $x_rate, $short, $loan_req, $raised, $needed, $partid, $partner, 
+	$part_rating, $part_kivastart, $part_kivatime, $part_kivaents, $part_totloans, $part_delinq, $part_default, $part_xloss,
+	$part_fundstat, $part_network, $part_email, $part_womenents, $part_aveloan, $part_aveindloan, $part_avegrploan, 
+	$part_aveentsgroup, $part_avelocalgdp, $part_aveloangdp, $part_aveloanfund, $part_averaised, $part_aveterm, $part_totjourn,
+	$part_journcov, $part_journcovkiva, $part_journfreqloan, $part_averecom, $part_interpart, $part_localinter) =
+	    split(/\t/, $string);
+    $self->{'type'} = $type;
+    $self->{'time'} = str2time($time);
+    $self->{'url'} = $url;
+    $self->{'id'} = $id;
+    $self->{'name'} = $name;
+    $self->{'act'} = $act;
+    $self->{'loan'} = $loan;
+    $self->{'days'} = $days;
+    $self->{'country'} = $country;
+    $self->{'partner'} = $partner;
+    $self->{'part_id'} = $partid;
+    $self->{'short'} = $short;
+    $self->{'use'} = $use;
+    $self->{'repay'} = $repay;
+    $self->{'repaid'} = $repaid;
+    $self->{'listed'} = $listed;
+    $self->{'disb'} = $disb;
+    $self->{'fund'} = $fund;
+    $self->{'kiva_time'} = $kiva_time;
+    $self->{'kiva_ents'} = $kiva_ents;
+    $self->{'tot_loans'} = $tot_loans;
+    $self->{'delinq'} = $delinq;
+    $self->{'default'} = $default;
+    $self->{'group_name'} = $group_name;
+    $self->{'group_members'} = $group_members;
+    $self->{'location'} = $location;
+    $self->{'curr_x'} = $curr_x;
+    $self->{'curr_rate'} = $curr_rate;
+    $self->{'ave_income'} = $ave_income;
+    $self->{'curr'} = $curr;
+    $self->{'x_rate'} = $x_rate;
+    $self->{'loan_req'} = $loan_req;
+    $self->{'raised'} = $raised;
+    $self->{'needed'} = $needed;
+    my $part = {
+	id => $partid,
+FieldPartnerRiskRating =>$part_rating,
+FieldPartner => $partner,
+StartDateOnKiva =>$part_kivastart,
+TimeOnKiva =>$part_kivatime,
+KivaEntrepreneurs =>$part_kivaents,
+TotalLoans =>$part_totloans,
+DelinquencyRate =>$part_delinq,
+DefaultRate =>$part_default,
+CurrencyExchangeLossRate =>$part_xloss,
+FundraisingStatus =>$part_fundstat,
+NetworkAffiliation =>$part_network,
+EmailContact =>$part_email,
+LoanstoWomenEntrepreneurs =>$part_womenents,
+AverageLoanSize =>$part_aveloan,
+AverageIndividualLoanSize =>$part_aveindloan,
+AverageGroupLoanSize =>$part_avegrploan,
+AverageNumberOfEntrepreneursPerGroup =>$part_aveentsgroup,
+AverageGDPPerCapitaPPPinLocalCountry =>$part_avelocalgdp,
+AverageLoanSizeGDPPerCapitaPPP =>$part_aveloangdp,
+AverageTimeToFundALoan =>$part_aveloanfund,
+AverageDollarsRaisedPerDayPerLoan =>$part_averaised,
+AverageLoanTerm =>$part_aveterm,
+TotalJournals =>$part_totjourn,
+JournalCoverage =>$part_journcov,
+JournalCoverageKivaFellows =>$part_journcovkiva,
+JournalFrequencyAveragePerLoanPerYear =>$part_journfreqloan,
+AverageNumberOfRecommendationsPerJournal =>$part_averecom,
+AverageInterestRateBorrowerPaysToKivaFieldPartner =>$part_interpart,
+AverageLocalMoneyLenderInterestRate =>$part_localinter
+    };
+    bless $self, $pkg;
+    return ($self, $part);
+}
+
+#utility functions for the class
+sub is_newer{
+    my ($self, $targ) = @_;
+    return ($self->{time} > $targ->{time});
+}
+
+sub is_different{
+    my ($self, $targ) = @_;
+    foreach (qw/ type id act loan days country partner part_id use repay repaid listed disb
+             fund kiva_time kiva_ents tot_loans delinq default
+	 location curr_x curr_rate ave_income curr x_rate short loan_req raised needed/){
+	next if (!$self->{$_} && !$targ->{$_});
+	if (($self->{$_} && !$targ->{$_})||
+	    (!$self->{$_} && $targ->{$_})||
+	    (clean($self->{$_}) ne clean($targ->{$_}))){
+#	    printf("'%s' is different from '%s'\n",$self->{$_},$targ->{$_});
+	    return 1;
+	}
+    }
+    return $self->{'part_obj'}->is_different($targ->{'part_obj'});
+}
+
+sub to_string{
+    my ($self) = @_;
+    my @ret = ();
+    foreach (qw/ type time url id name act loan days country partner part_id use repay repaid listed disb 
+	     fund kiva_time kiva_ents tot_loans delinq default group_name group_members
+	     location curr_x curr_rate ave_income curr x_rate short loan_req raised needed/){
+	if ($_ eq "time"){
+	    my ($sec,$min,$hour,$mday,$mon,$year) = localtime($self->{$_});
+	    push @ret, sprintf("%4u-%02u-%02u %02u:%02u:%02u", $year+1900, $mon, $mday, $hour, $min, $sec);
+	}
+	else{
+	    push @ret, ($self->{$_}?$self->{$_}:"");
+	}
+#	printf("%s : %s\n", $_, $self->{$_});
+    }
+    push @ret, $self->{'part_obj'}->to_string(); 
+    return \@ret;
 }
 
 1;
