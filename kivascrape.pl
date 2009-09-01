@@ -65,7 +65,7 @@ for (my $page = 1; 1==1; $page++)
     print "Found: ",scalar(@links)," anchor tags\n";
     my $position = 1;
     for my $link (@links){
-	next if ($link->as_HTML() =~ /img/ || $link->attr("href") =~ /rss/);
+	next if ($link->as_HTML() =~ /img/ || $link->attr("href") =~ /rss/ || $link->attr("href") =~ /javascript/ || $link->attr("href") =~ /#/);
 	next if $done{$link->attr("href")}; #stripping out duplicate urls. every table row has three, one is an img so that's removed earlier
 	my $ent = KivaEnt->new_from_url($link->attr("href"));
 	$ent->insertDB($dbh) unless $ent->inDB($dbh);

@@ -48,7 +48,7 @@ sub inDB{
   my @params = ();
   foreach (qw/ id type act loan days country part_id use repay repaid listed disb 
 	     kiva_time kiva_ents tot_loans delinq default location ave_income loan_req raised needed short/){
-	    push @params, ($self->{$_}?$self->{$_}:"");
+	    push @params, ($self->{$_}?fixnumeric($self->{$_}):"");
     }
   my $rows = $dbh->selectall_arrayref($chkqry, {}, @params) or die "Error selecting from database: ".$dbh->errstr."\n";
   return (scalar(@$rows) > 0);
@@ -56,17 +56,17 @@ sub inDB{
 
 
 my $ins_qry = q{
-INSERT INTO kiva_ent(type, time, url, id, name, activity, loanamt, daysleft, country, loan_use, repayrate, partner, repaid, listdate, 
+INSERT INTO kiva_ent(type, url, id, name, activity, loanamt, daysleft, country, loan_use, repayrate, partner, repaid, listdate, 
 disbursmentdate, fundraising, timeonkiva, entreponkiva, totalloans, delinquentrate, defaultrate, groupname, groupmembers, location, 
 currencyexchange, currencyexchangeloss, averageincome, currency, exchangerate, description, loanreq, raised, needed)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 };
 
 sub insertDB {
   my $self = shift;
   my $dbh = shift;
   my @params = ();
-foreach (qw/ type time url id name act loan days country use repay partner repaid listed disb 
+foreach (qw/ type  url id name act loan days country use repay partner repaid listed disb 
 	     fund kiva_time kiva_ents tot_loans delinq default group_name group_members
 	     location curr_x curr_rate ave_income curr x_rate short loan_req raised needed/){
 	if ($_ eq "time"){
@@ -74,7 +74,7 @@ foreach (qw/ type time url id name act loan days country use repay partner repai
 	    push @params, sprintf("%4u-%02u-%02u %02u:%02u:%02u", $year+1900, $mon, $mday, $hour, $min, $sec);
 	}
 	else{
-	    push @params, ($self->{$_}?$self->{$_}:"");
+	    push @params, ($self->{$_}?fixnumeric($self->{$_}):"");
 	}
     }
    $dbh->do($ins_qry, {}, @params) or die "Error inserting ent: ".$dbh->errstr."\n";
@@ -89,8 +89,18 @@ sub insertPosition{
   $dbh->do($pos_qry, {}, ($self->{'id'}, $page, $pos)) or die "Error inserting position data".$dbh->errstr."\n";
 }
 
+sub fixnumeric{
+  my $str = shift;
+  return undef unless $str;
+  $str =~ s/[\$\%,]//g;
+  return $str;
+}
 
 #utility functions for the class
+
+my %months = (
+	    'Jan' => 1, 'Feb' =>2, 'Mar'=>3, 'Apr'=>4, 'May'=>5, 'Jun'=>6, 'Jul'=>7, 'Aug'=>8, 'Sep'=>9, 'Oct'=>10, 'Nov'=>11, 'Dec'=>12
+);
 
 sub new_from_url{
     my ($pkg, $url) = @_;
@@ -145,7 +155,11 @@ sub new_from_url{
     $self->{'use'} = $values{'LoanUse'};
     $self->{'repaid'} = $values{'LendersRepaid'};
     $self->{'repay'} = $values{'RepaymentTerm'};
+    my ($m, $d, $y) = split (/[,\s]+/, $values{'DateListed'});
+    $values{'DateListed'} = "$y-".$months{$m}."-$d";
     $self->{'listed'} = $values{'DateListed'};
+    ($m, $d, $y) = split (/[,\s]+/, $values{'DateDisbursed'});
+    $values{'DateDisbursed'} = "$y-".$months{$m}."-$d";
     $self->{'disb'} = $values{'DateDisbursed'};
     $self->{'location'} = $values{'Location'};
     $self->{'curr_x'} = $values{'CurrencyExchangeLoss'};

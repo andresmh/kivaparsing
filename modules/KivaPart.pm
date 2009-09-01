@@ -28,7 +28,8 @@ CurrencyExchangeLossRate FundraisingStatus NetworkAffiliation EmailContact Loans
 AverageNumberOfEntrepreneursPerGroup AverageGDPPerCapitaPPPinLocalCountry AverageLoanSizeGDPPerCapitaPPP AverageTimeToFundALoan
 AverageDollarsRaisedPerDayPerLoan AverageLoanTerm TotalJournals JournalCoverage JournalCoverageKivaFellows JournalFrequencyAveragePerLoanPerYear
 AverageNumberOfRecommendationsPerJournal AverageInterestRateBorrowerPaysToKivaFieldPartner AverageLocalMoneyLenderInterestRate/){
-	    push @params, ($self->{$_}?$self->{$_}:"");
+	    push @params, ($self->{$_}?fixnumeric($self->{$_}):"");
+#	    warn "$_ : ".$self->{$_}."\n";
     }
   $dbh->do($part_ins, {}, @params) or die "Error inserting partner: ".$dbh->errstr."\n";
 }
@@ -175,26 +176,32 @@ sub new_from_url{
 	    $values{clean($label)} =  clean($value);
 #	$values{clean($tmp[0])} =clean($tmp[1]) if $tmp[0] =~ /Loan/;
 	    $values{clean($label)} =  clean($conts[1]->as_HTML()) if ($label =~ /Risk\s?Rating/);
-	    printf("Values: %s - %s\n", $label, $value);
+#	    printf("Values: %s - %s\n", $label, $value);
 	}
     }
+
+my %months = (
+	    'Jan' => 1, 'Feb' =>2, 'Mar'=>3, 'Apr'=>4, 'May'=>5, 'Jun'=>6, 'Jul'=>7, 'Aug'=>8, 'Sep'=>9, 'Oct'=>10, 'Nov'=>11, 'Dec'=>12
+);
 
     $self->{'FieldPartnerRiskRating'} += () = $values{'FieldPartnerRiskRating'} =~ /(on_small)/g; 
 #counting the number of stars on_small vs off_small
 
     $self->{'FieldPartner'} = $values{'FieldPartner'};
+    my ($m, $d, $y) = split (/[,\s]+/, $values{'StartDateOnKiva'});
+    $values{'StartDateOnKiva'} = "$y-".$months{$m}."-$d";
     $self->{'StartDateOnKiva'} = $values{'StartDateOnKiva'};
     $self->{'TimeOnKiva'} = $values{'TimeOnKiva'};
     $self->{'KivaEntrepreneurs'} = $values{'KivaEntrepreneurs'};
     $self->{'TotalLoans'} = fixnumeric($values{'TotalLoans'});
-    $self->{'DelinquencyRate'} = fixnumeric($values{'DelinquencyRate'});
+    $self->{'DelinquencyRate'} = fixnumeric($values{'DelinquencyRate'}); 
     $self->{'DefaultRate'} = fixnumeric($values{'DefaultRate'});
-    $self->{'CurrencyExchangeLossRate'} = $values{'CurrencyExchangeLossRate'};
+    $self->{'CurrencyExchangeLossRate'} = fixnumeric($values{'CurrencyExchangeLossRate'});
     $self->{'FundraisingStatus'} = $values{'FundraisingStatus'};
     $self->{'NetworkAffiliation'} = $values{'NetworkAffiliation'};
     $self->{'EmailContact'} = $values{'EmailContact'};
-    $self->{'LoanstoWomenEntrepreneurs'} = $values{'LoanstoWomenEntrepreneurs'};
-    $self->{'AverageLoanSize'} = $values{'AverageLoanSize'};
+    $self->{'LoanstoWomenEntrepreneurs'} = fixnumeric($values{'LoanstoWomenEntrepreneurs'}); 
+    $self->{'AverageLoanSize'} = fixnumeric($values{'AverageLoanSize'});
     $self->{'AverageIndividualLoanSize'} = $values{'AverageIndividualLoanSize'};
     $self->{'AverageGroupLoanSize'} = $values{'AverageGroupLoanSize'};
     $self->{'AverageNumberOfEntrepreneursPerGroup'} = $values{'AverageNumberOfEntrepreneursPerGroup'};
